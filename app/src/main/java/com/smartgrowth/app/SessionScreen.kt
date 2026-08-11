@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,7 +33,7 @@ fun getDayOfWeekAbbr(dateStr: String): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val date = sdf.parse(dateStr) ?: return ""
         SimpleDateFormat("EEE", Locale.US).format(date)
-    } catch (e: Exception) {
+    } catch (_: Exception) { // Fixed unused variable warning
         ""
     }
 }
@@ -64,8 +65,11 @@ fun SessionScreen(viewModel: StudentViewModel) {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.DateRange, contentDescription = "Schedule Logo", modifier = Modifier.padding(end = 8.dp))
-                        Text("Class Timetable", fontWeight = FontWeight.Bold)
+                        Surface(shape = CircleShape, color = Color.White, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Eco, contentDescription = "Logo", tint = BrandGreen, modifier = Modifier.padding(4.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Smart Growth", fontWeight = FontWeight.ExtraBold)
                     }
                 },
                 actions = {
@@ -137,7 +141,7 @@ fun SessionScreen(viewModel: StudentViewModel) {
                 }
 
                 if (filteredSessions.isEmpty()) {
-                    item { EmptyScheduleState(onAddClick = { showAddDialog = true }, isFiltered = selectedDateFilter != null) }
+                    item { EmptyScheduleState(isFiltered = selectedDateFilter != null) }
                 } else {
                     items(filteredSessions) { session ->
                         SessionTicket(session = session, onClick = { editingSession = session })
@@ -364,12 +368,13 @@ fun SessionCalendarCard(
 }
 
 @Composable
-fun EmptyScheduleState(onAddClick: () -> Unit, isFiltered: Boolean = false) {
+fun EmptyScheduleState(isFiltered: Boolean = false) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(shape = CircleShape, color = BrandBlue.copy(alpha = 0.1f), modifier = Modifier.size(80.dp)) {
-            Icon(Icons.Default.EventNote, contentDescription = null, tint = BrandBlue, modifier = Modifier.padding(20.dp))
+            // Fixed deprecated icon reference
+            Icon(Icons.AutoMirrored.Filled.EventNote, contentDescription = null, tint = BrandBlue, modifier = Modifier.padding(20.dp))
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(
@@ -400,7 +405,8 @@ fun SessionTicket(session: Session, onClick: () -> Unit) {
                 Text(text = session.startTime, style = MaterialTheme.typography.titleSmall, color = BrandBlue, fontWeight = FontWeight.ExtraBold)
             }
 
-            Divider(color = Color(0xFFE2E8F0), modifier = Modifier.height(50.dp).width(1.dp).padding(horizontal = 8.dp))
+            // Fixed deprecated Divider - replaced with VerticalDivider
+            VerticalDivider(color = Color(0xFFE2E8F0), modifier = Modifier.height(50.dp).padding(horizontal = 8.dp))
 
             Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
                 Text(text = session.studentName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color(0xFF0F172A))
@@ -439,7 +445,7 @@ fun BookSessionDialog(
     val calendar = Calendar.getInstance()
 
     val studentOptions = students.map { "${it.firstName} ${it.lastName}" }
-    val tutorOptions = tutors.map { it.fullName }
+    val tutorOptions = tutors.map { "${it.firstName} ${it.lastName}" }
     val programOptions = listOf("One-on-One", "Small Group", "Homework Assistance", "Exam Prep")
 
     var studentName by remember { mutableStateOf(session?.studentName.takeIf { !it.isNullOrBlank() } ?: studentOptions.firstOrNull() ?: "") }
@@ -451,8 +457,8 @@ fun BookSessionDialog(
     var startTime by remember { mutableStateOf(session?.startTime ?: "10:00 AM") }
     var endTime by remember { mutableStateOf(session?.endTime ?: "11:00 AM") }
 
-    // Tutor Availability Validation Logic
-    val selectedTutor = tutors.find { it.fullName == tutorName }
+    // Tutor Availability Validation Logic (Updated to use firstName + lastName)
+    val selectedTutor = tutors.find { "${it.firstName} ${it.lastName}" == tutorName }
     val availabilityMap = remember(selectedTutor?.availability) {
         parseAvailability(selectedTutor?.availability ?: "")
     }
@@ -532,9 +538,9 @@ fun BookSessionDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = when {
-                                    tutorDaySchedule != null -> "${selectedTutor.fullName} is working $dayOfWeekStr: ${tutorDaySchedule.first} - ${tutorDaySchedule.second}"
-                                    availabilityMap.isNotEmpty() -> "⚠️ ${selectedTutor.fullName} is NOT scheduled on $dayOfWeekStr"
-                                    else -> "No specific availability set for ${selectedTutor.fullName}."
+                                    tutorDaySchedule != null -> "${selectedTutor.firstName} is working $dayOfWeekStr: ${tutorDaySchedule.first} - ${tutorDaySchedule.second}"
+                                    availabilityMap.isNotEmpty() -> "⚠️ ${selectedTutor.firstName} is NOT scheduled on $dayOfWeekStr"
+                                    else -> "No specific availability set for ${selectedTutor.firstName}."
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = when {

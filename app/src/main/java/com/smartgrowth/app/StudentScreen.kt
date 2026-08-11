@@ -6,13 +6,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Refresh
@@ -46,8 +49,11 @@ fun StudentScreen(viewModel: StudentViewModel) {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.School, contentDescription = "School Logo", modifier = Modifier.padding(end = 8.dp))
-                        Text("Student Desk", fontWeight = FontWeight.Bold)
+                        Surface(shape = CircleShape, color = Color.White, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Eco, contentDescription = "Logo", tint = BrandGreen, modifier = Modifier.padding(4.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Smart Growth", fontWeight = FontWeight.ExtraBold)
                     }
                 },
                 actions = {
@@ -89,7 +95,7 @@ fun StudentScreen(viewModel: StudentViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (students.isEmpty()) {
-                    item { EmptyClassroomState(onEnrollClick = { showAddDialog = true }) }
+                    item { EmptyClassroomState() }
                 } else {
                     items(students) { student ->
                         StudentFlashcard(student = student, onClick = { editingStudent = student })
@@ -105,11 +111,11 @@ fun StudentScreen(viewModel: StudentViewModel) {
                     showAddDialog = false
                     editingStudent = null
                 },
-                onSave = { firstName, lastName, grade, phone ->
+                onSave = { firstName, middleName, lastName, grade, phone, email, school ->
                     if (editingStudent != null) {
-                        viewModel.updateStudent(editingStudent!!, firstName, lastName, grade, phone)
+                        viewModel.updateStudent(editingStudent!!, firstName, middleName, lastName, grade, phone, email, school)
                     } else {
-                        viewModel.addStudent(firstName, lastName, grade, phone)
+                        viewModel.addStudent(firstName, middleName, lastName, grade, phone, email, school)
                     }
                     showAddDialog = false
                     editingStudent = null
@@ -120,7 +126,7 @@ fun StudentScreen(viewModel: StudentViewModel) {
 }
 
 @Composable
-fun EmptyClassroomState(onEnrollClick: () -> Unit) {
+fun EmptyClassroomState() {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -156,13 +162,15 @@ fun StudentFlashcard(student: Student, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "${student.firstName} ${student.lastName}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color(0xFF0F172A))
+                val midInitial = if(student.middleName.isNotBlank()) "${student.middleName.take(1).uppercase()}." else ""
+                val formattedName = "${student.firstName} $midInitial ${student.lastName}".replace("  ", " ")
+                Text(text = formattedName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color(0xFF0F172A))
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(color = BrandLightBlue.copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp), border = BorderStroke(1.dp, BrandLightBlue.copy(alpha = 0.3f))) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
-                            Icon(Icons.Default.MenuBook, contentDescription = "Grade", tint = BrandLightBlue, modifier = Modifier.size(12.dp))
+                            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = "Grade", tint = BrandLightBlue, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(text = student.gradeLevel, color = BrandLightBlue, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
@@ -207,13 +215,17 @@ fun SmartDropdownMenu(label: String, options: List<String>, selectedOption: Stri
 }
 
 @Composable
-fun EnrollmentFormDialog(student: Student? = null, onDismiss: () -> Unit, onSave: (String, String, String, String) -> Unit) {
+fun EnrollmentFormDialog(student: Student? = null, onDismiss: () -> Unit, onSave: (String, String, String, String, String, String, String) -> Unit) {
     var firstName by remember { mutableStateOf(student?.firstName ?: "") }
+    var middleName by remember { mutableStateOf(student?.middleName ?: "") }
     var lastName by remember { mutableStateOf(student?.lastName ?: "") }
 
     val gradeOptions = listOf("Pre-K / Kinder", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Junior High", "Senior High")
     var grade by remember { mutableStateOf(student?.gradeLevel ?: gradeOptions[0]) }
+
     var phone by remember { mutableStateOf(student?.parentContact ?: "") }
+    var email by remember { mutableStateOf(student?.parentEmail ?: "") }
+    var school by remember { mutableStateOf(student?.schoolEnrolled ?: "") }
 
     val isEdit = student != null
 
@@ -228,19 +240,27 @@ fun EnrollmentFormDialog(student: Student? = null, onDismiss: () -> Unit, onSave
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp).verticalScroll(rememberScrollState())) {
                 OutlinedTextField(value = firstName, onValueChange = { firstName = it }, label = { Text("First Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = middleName, onValueChange = { middleName = it }, label = { Text("Middle Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = lastName, onValueChange = { lastName = it }, label = { Text("Last Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
                 SmartDropdownMenu(label = "Grade Level", options = gradeOptions, selectedOption = grade) { grade = it }
+                OutlinedTextField(value = school, onValueChange = { school = it }, label = { Text("School Currently Enrolled (Optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFFE2E8F0))
+                Text("Parent/Guardian Info", style = MaterialTheme.typography.labelMedium, color = BrandBlue, fontWeight = FontWeight.Bold)
+
                 OutlinedTextField(
-                    value = phone, onValueChange = { phone = it }, label = { Text("Parent Contact") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    value = phone, onValueChange = { phone = it }, label = { Text("Contact Number") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
                 )
+                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email (Optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             Button(
-                onClick = { if (firstName.isNotBlank() && lastName.isNotBlank()) onSave(firstName, lastName, grade, phone) },
+                onClick = { if (firstName.isNotBlank() && lastName.isNotBlank() && phone.isNotBlank()) onSave(firstName, middleName, lastName, grade, phone, email, school) },
                 colors = ButtonDefaults.buttonColors(containerColor = BrandGreen), shape = RoundedCornerShape(8.dp)
             ) {
                 Text(if (isEdit) "Save Changes" else "Complete Enrollment", fontWeight = FontWeight.Bold)

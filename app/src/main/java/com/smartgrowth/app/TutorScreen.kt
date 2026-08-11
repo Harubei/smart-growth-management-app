@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
@@ -52,14 +53,14 @@ fun pickTime(context: Context, defaultTime: String, onTimeSelected: (String) -> 
         if (isPM && hour != 12) hour += 12
         if (!isPM && hour == 12) hour = 0
         minute = parts[1].toInt()
-    } catch (e: Exception) {}
+    } catch (_: Exception) {} // Safe underscore prevents compiler warnings
 
     android.app.TimePickerDialog(
         context,
         { _, selectedHour, selectedMinute ->
             val amPm = if (selectedHour >= 12) "PM" else "AM"
             val hour12 = if (selectedHour % 12 == 0) 12 else selectedHour % 12
-            onTimeSelected(String.format(java.util.Locale.getDefault(), "%02d:%02d %s", if (hour12 == 0) 12 else hour12, selectedMinute, amPm))
+            onTimeSelected(String.format(java.util.Locale.getDefault(), "%02d:%02d %s", hour12, selectedMinute, amPm))
         },
         hour, minute, false
     ).show()
@@ -79,8 +80,11 @@ fun TutorScreen(viewModel: StudentViewModel) {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, contentDescription = "Staff Logo", modifier = Modifier.padding(end = 8.dp))
-                        Text("Staff Directory", fontWeight = FontWeight.Bold)
+                        Surface(shape = CircleShape, color = Color.White, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Eco, contentDescription = "Logo", tint = BrandGreen, modifier = Modifier.padding(4.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Smart Growth", fontWeight = FontWeight.ExtraBold)
                     }
                 },
                 actions = {
@@ -120,7 +124,7 @@ fun TutorScreen(viewModel: StudentViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (tutors.isEmpty()) {
-                    item { EmptyStaffState(onAddClick = { showAddDialog = true }) }
+                    item { EmptyStaffState() }
                 } else {
                     items(tutors) { tutor ->
                         TutorIDCard(tutor = tutor, onClick = { editingTutor = tutor })
@@ -136,12 +140,12 @@ fun TutorScreen(viewModel: StudentViewModel) {
                     showAddDialog = false
                     editingTutor = null
                 },
-                onSave = { name, phone, capacity, availability ->
+                onSave = { firstName, middleName, lastName, phone, email, capacity, availability, subjects ->
                     val safeCapacity = capacity.toIntOrNull() ?: 1
                     if (editingTutor != null) {
-                        viewModel.updateTutor(editingTutor!!, name, phone, safeCapacity, availability)
+                        viewModel.updateTutor(editingTutor!!, firstName, middleName, lastName, phone, email, safeCapacity, availability, subjects)
                     } else {
-                        viewModel.addTutor(name, phone, safeCapacity, availability)
+                        viewModel.addTutor(firstName, middleName, lastName, phone, email, safeCapacity, availability, subjects)
                     }
                     showAddDialog = false
                     editingTutor = null
@@ -152,7 +156,7 @@ fun TutorScreen(viewModel: StudentViewModel) {
 }
 
 @Composable
-fun EmptyStaffState(onAddClick: () -> Unit) {
+fun EmptyStaffState() {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 64.dp), horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -180,14 +184,17 @@ fun TutorIDCard(tutor: Tutor, onClick: () -> Unit) {
         ) {
             Surface(shape = CircleShape, color = BrandGreen.copy(alpha = 0.1f), modifier = Modifier.size(56.dp)) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(text = tutor.fullName.take(1).uppercase(), color = BrandGreen, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(text = tutor.firstName.take(1).uppercase(), color = BrandGreen, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = tutor.fullName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color(0xFF0F172A))
+                val midInitial = if(tutor.middleName.isNotBlank()) "${tutor.middleName.take(1).uppercase()}." else ""
+                val formattedName = "${tutor.firstName} $midInitial ${tutor.lastName}".replace("  ", " ")
+
+                Text(text = formattedName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color(0xFF0F172A))
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -203,6 +210,16 @@ fun TutorIDCard(tutor: Tutor, onClick: () -> Unit) {
                     Icon(Icons.Default.Phone, contentDescription = "Phone", modifier = Modifier.size(14.dp), tint = ChalkGray)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = tutor.phone, style = MaterialTheme.typography.labelSmall, color = ChalkGray, fontWeight = FontWeight.Medium)
+                }
+
+                if (tutor.hireDate.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Hired: ${tutor.hireDate}", style = MaterialTheme.typography.labelSmall, color = ChalkGray, fontWeight = FontWeight.Bold)
+                }
+
+                if (tutor.subjectsHandled.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(text = "SUBJECTS: ${tutor.subjectsHandled.uppercase()}", style = MaterialTheme.typography.labelSmall, color = BrandBlue, fontWeight = FontWeight.Bold)
                 }
 
                 // Dynamic Availability Schedule Display
@@ -233,13 +250,20 @@ fun TutorIDCard(tutor: Tutor, onClick: () -> Unit) {
 }
 
 @Composable
-fun TutorOnboardingDialog(tutor: Tutor? = null, onDismiss: () -> Unit, onSave: (String, String, String, String) -> Unit) {
+fun TutorOnboardingDialog(tutor: Tutor? = null, onDismiss: () -> Unit, onSave: (String, String, String, String, String, String, String, String) -> Unit) {
     val context = LocalContext.current
-    var name by remember { mutableStateOf(tutor?.fullName ?: "") }
+    var firstName by remember { mutableStateOf(tutor?.firstName ?: "") }
+    var middleName by remember { mutableStateOf(tutor?.middleName ?: "") }
+    var lastName by remember { mutableStateOf(tutor?.lastName ?: "") }
     var phone by remember { mutableStateOf(tutor?.phone ?: "") }
+    var email by remember { mutableStateOf(tutor?.email ?: "") }
 
     val capacityOptions = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
     var capacity by remember { mutableStateOf(tutor?.maxCapacity?.toString() ?: capacityOptions[0]) }
+
+    // New Subject Checklist Setup
+    val subjectOptions = listOf("Reading and Writing", "Math and Science", "Homework Assistance", "Exam Preparation")
+    var subjectsSet by remember { mutableStateOf(tutor?.subjectsHandled?.split(", ")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()) }
 
     val allDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
@@ -277,14 +301,37 @@ fun TutorOnboardingDialog(tutor: Tutor? = null, onDismiss: () -> Unit, onSave: (
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.padding(top = 8.dp).verticalScroll(rememberScrollState())
             ) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Full Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = firstName, onValueChange = { firstName = it }, label = { Text("First Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = middleName, onValueChange = { middleName = it }, label = { Text("Middle Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = lastName, onValueChange = { lastName = it }, label = { Text("Last Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
                 OutlinedTextField(
                     value = phone, onValueChange = { phone = it }, label = { Text("Phone Number") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
                 )
+                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email Address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
                 SmartDropdownMenu(label = "Max Capacity", options = capacityOptions, selectedOption = capacity) { capacity = it }
 
-                Divider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFFE2E8F0))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFFE2E8F0))
+                Text("Subjects Handled", style = MaterialTheme.typography.labelMedium, color = BrandBlue, fontWeight = FontWeight.Bold)
+
+                Column(modifier = Modifier.fillMaxWidth().background(NotebookBackground, RoundedCornerShape(8.dp)).padding(8.dp)) {
+                    subjectOptions.forEach { subject ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Checkbox(
+                                checked = subjectsSet.contains(subject),
+                                onCheckedChange = { checked ->
+                                    subjectsSet = if (checked) subjectsSet + subject else subjectsSet - subject
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = BrandGreen)
+                            )
+                            Text(subject, style = MaterialTheme.typography.labelMedium, color = Color(0xFF0F172A))
+                        }
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFFE2E8F0))
 
                 // Toggle between Static (Fast) and Dynamic schedules
                 Row(
@@ -382,9 +429,10 @@ fun TutorOnboardingDialog(tutor: Tutor? = null, onDismiss: () -> Unit, onSave: (
         confirmButton = {
             Button(
                 onClick = {
-                    if (name.isNotBlank()) {
+                    if (firstName.isNotBlank() && lastName.isNotBlank()) {
                         val serializedSchedule = serializeAvailability(scheduleMap)
-                        onSave(name, phone, capacity, serializedSchedule)
+                        val serializedSubjects = subjectsSet.joinToString(", ")
+                        onSave(firstName, middleName, lastName, phone, email, capacity, serializedSchedule, serializedSubjects)
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = BrandGreen), shape = RoundedCornerShape(8.dp)

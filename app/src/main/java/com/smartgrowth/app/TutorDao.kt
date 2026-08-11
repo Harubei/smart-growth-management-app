@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TutorDao {
-    @Query("SELECT * FROM tutors ORDER BY fullName ASC")
+    @Query("SELECT * FROM tutors ORDER BY firstName ASC, lastName ASC")
     fun getAllTutors(): Flow<List<Tutor>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

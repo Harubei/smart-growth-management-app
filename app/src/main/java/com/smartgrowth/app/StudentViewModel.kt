@@ -16,6 +16,7 @@ import kotlinx.coroutines.sync.withLock
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.time.Duration.Companion.seconds
 
 class StudentViewModel(
     private val dao: StudentDao,
@@ -44,17 +45,18 @@ class StudentViewModel(
     }
 
     // --- CREATE COMMANDS ---
-    fun addStudent(firstName: String, lastName: String, grade: String, phone: String) {
+    fun addStudent(firstName: String, middleName: String, lastName: String, grade: String, phone: String, email: String, school: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val currentDate = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date())
-            dao.insertStudent(Student(firstName = firstName, lastName = lastName, gradeLevel = grade, parentContact = phone, parentEmail = null, enrollmentDate = currentDate))
+            dao.insertStudent(Student(firstName = firstName, middleName = middleName, lastName = lastName, gradeLevel = grade, parentContact = phone, parentEmail = email, schoolEnrolled = school, enrollmentDate = currentDate))
             performFullSync()
         }
     }
 
-    fun addTutor(name: String, phone: String, capacity: Int, availability: String) {
+    fun addTutor(firstName: String, middleName: String, lastName: String, phone: String, email: String, capacity: Int, availability: String, subjects: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            tutorDao.insertTutor(Tutor(fullName = name, phone = phone, maxCapacity = capacity, availability = availability))
+            val currentDate = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date())
+            tutorDao.insertTutor(Tutor(firstName = firstName, middleName = middleName, lastName = lastName, phone = phone, email = email, maxCapacity = capacity, availability = availability, subjectsHandled = subjects, hireDate = currentDate))
             performFullSync()
         }
     }
@@ -74,16 +76,16 @@ class StudentViewModel(
     }
 
     // --- UPDATE COMMANDS ---
-    fun updateStudent(student: Student, firstName: String, lastName: String, grade: String, phone: String) {
+    fun updateStudent(student: Student, firstName: String, middleName: String, lastName: String, grade: String, phone: String, email: String, school: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.updateStudent(student.copy(firstName = firstName, lastName = lastName, gradeLevel = grade, parentContact = phone, isSynced = false))
+            dao.updateStudent(student.copy(firstName = firstName, middleName = middleName, lastName = lastName, gradeLevel = grade, parentContact = phone, parentEmail = email, schoolEnrolled = school, isSynced = false))
             performFullSync()
         }
     }
 
-    fun updateTutor(tutor: Tutor, name: String, phone: String, capacity: Int, availability: String) {
+    fun updateTutor(tutor: Tutor, firstName: String, middleName: String, lastName: String, phone: String, email: String, capacity: Int, availability: String, subjects: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            tutorDao.updateTutor(tutor.copy(fullName = name, phone = phone, maxCapacity = capacity, availability = availability, isSynced = false))
+            tutorDao.updateTutor(tutor.copy(firstName = firstName, middleName = middleName, lastName = lastName, phone = phone, email = email, maxCapacity = capacity, availability = availability, subjectsHandled = subjects, isSynced = false))
             performFullSync()
         }
     }
@@ -95,6 +97,7 @@ class StudentViewModel(
         }
     }
 
+    @Suppress("unused") // Preserved for future use
     fun updateSessionStatus(session: Session, newStatus: String) {
         viewModelScope.launch(Dispatchers.IO) {
             sessionDao.updateSession(session.copy(status = newStatus, isSynced = false))
@@ -119,10 +122,10 @@ class StudentViewModel(
                     pushUnsyncedData()
                     pullLatestData()
                     _syncStatus.value = "Data is up to date!"
-                    kotlinx.coroutines.delay(2000)
-                } catch (e: Exception) {
-                    _syncStatus.value = "Sync Error: ${e.message}"
-                    kotlinx.coroutines.delay(3000)
+                    kotlinx.coroutines.delay(2.seconds) // Updated to modern Duration API
+                } catch (_: Exception) {
+                    _syncStatus.value = "Sync Error/Offline"
+                    kotlinx.coroutines.delay(3.seconds) // Updated to modern Duration API
                 } finally {
                     _syncStatus.value = "Idle"
                 }
@@ -135,23 +138,22 @@ class StudentViewModel(
 
         dao.getUnsyncedStudents().forEach { student ->
             try {
-                val map = hashMapOf("firstName" to student.firstName, "lastName" to student.lastName, "gradeLevel" to student.gradeLevel, "parentContact" to student.parentContact, "parentEmail" to student.parentEmail, "enrollmentDate" to student.enrollmentDate)
+                val map = hashMapOf("firstName" to student.firstName, "middleName" to student.middleName, "lastName" to student.lastName, "gradeLevel" to student.gradeLevel, "parentContact" to student.parentContact, "parentEmail" to student.parentEmail, "schoolEnrolled" to student.schoolEnrolled, "enrollmentDate" to student.enrollmentDate)
                 Tasks.await(db.collection("students").document(student.id).set(map))
                 dao.updateStudent(student.copy(isSynced = true))
-            } catch (e: Exception) { }
+            } catch (_: Exception) { }
         }
 
         tutorDao.getUnsyncedTutors().forEach { tutor ->
             try {
                 val map = hashMapOf(
-                    "fullName" to tutor.fullName,
-                    "phone" to tutor.phone,
-                    "maxCapacity" to tutor.maxCapacity,
-                    "availability" to tutor.availability
+                    "firstName" to tutor.firstName, "middleName" to tutor.middleName, "lastName" to tutor.lastName,
+                    "phone" to tutor.phone, "email" to tutor.email, "hireDate" to tutor.hireDate,
+                    "maxCapacity" to tutor.maxCapacity, "availability" to tutor.availability, "subjectsHandled" to tutor.subjectsHandled
                 )
                 Tasks.await(db.collection("tutors").document(tutor.id).set(map))
                 tutorDao.updateTutor(tutor.copy(isSynced = true))
-            } catch (e: Exception) { }
+            } catch (_: Exception) { }
         }
 
         sessionDao.getUnsyncedSessions().forEach { session ->
@@ -159,16 +161,15 @@ class StudentViewModel(
                 val map = hashMapOf("studentName" to session.studentName, "tutorName" to session.tutorName, "date" to session.date, "startTime" to session.startTime, "endTime" to session.endTime, "program" to session.program, "status" to session.status)
                 Tasks.await(db.collection("sessions").document(session.id).set(map))
                 sessionDao.updateSession(session.copy(isSynced = true))
-            } catch (e: Exception) { }
+            } catch (_: Exception) { }
         }
 
-        // CONFIRMATION: Payments are fully integrated into the push engine!
         paymentDao.getUnsyncedPayments().forEach { payment ->
             try {
                 val map = hashMapOf("studentName" to payment.studentName, "amount" to payment.amount, "date" to payment.date, "method" to payment.method, "notes" to payment.notes)
                 Tasks.await(db.collection("payments").document(payment.id).set(map))
                 paymentDao.updatePayment(payment.copy(isSynced = true))
-            } catch (e: Exception) { }
+            } catch (_: Exception) { }
         }
     }
 
@@ -180,9 +181,10 @@ class StudentViewModel(
             for (doc in studentsSnapshot.documents) {
                 dao.insertStudent(Student(
                     id = doc.id,
-                    firstName = doc.getString("firstName") ?: "", lastName = doc.getString("lastName") ?: "",
+                    firstName = doc.getString("firstName") ?: "", middleName = doc.getString("middleName") ?: "", lastName = doc.getString("lastName") ?: "",
                     gradeLevel = doc.getString("gradeLevel") ?: "", parentContact = doc.getString("parentContact") ?: "",
-                    parentEmail = doc.getString("parentEmail"), enrollmentDate = doc.getString("enrollmentDate") ?: "2026-07-01", isSynced = true
+                    parentEmail = doc.getString("parentEmail") ?: "", schoolEnrolled = doc.getString("schoolEnrolled") ?: "",
+                    enrollmentDate = doc.getString("enrollmentDate") ?: "2026-07-01", isSynced = true
                 ))
             }
 
@@ -191,10 +193,10 @@ class StudentViewModel(
             for (doc in tutorsSnapshot.documents) {
                 tutorDao.insertTutor(Tutor(
                     id = doc.id,
-                    fullName = doc.getString("fullName") ?: "",
-                    phone = doc.getString("phone") ?: "",
+                    firstName = doc.getString("firstName") ?: "", middleName = doc.getString("middleName") ?: "", lastName = doc.getString("lastName") ?: "",
+                    phone = doc.getString("phone") ?: "", email = doc.getString("email") ?: "", hireDate = doc.getString("hireDate") ?: "",
                     maxCapacity = doc.getLong("maxCapacity")?.toInt() ?: 1,
-                    availability = doc.getString("availability") ?: "",
+                    availability = doc.getString("availability") ?: "", subjectsHandled = doc.getString("subjectsHandled") ?: "",
                     isSynced = true
                 ))
             }
@@ -211,7 +213,6 @@ class StudentViewModel(
                 ))
             }
 
-            // CONFIRMATION: Payments are fully integrated into the pull engine!
             val paymentsSnapshot = Tasks.await(db.collection("payments").get())
             paymentDao.clearSyncedPayments()
             for (doc in paymentsSnapshot.documents) {
@@ -222,7 +223,7 @@ class StudentViewModel(
                     notes = doc.getString("notes") ?: "", isSynced = true
                 ))
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Fails gracefully if offline
         }
     }

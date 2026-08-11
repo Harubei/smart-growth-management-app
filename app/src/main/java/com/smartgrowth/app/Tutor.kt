@@ -7,9 +7,14 @@ import androidx.room.PrimaryKey
 data class Tutor(
     @PrimaryKey
     val id: String = java.util.UUID.randomUUID().toString(),
-    val fullName: String,
+    val firstName: String,
+    val middleName: String,
+    val lastName: String,
     val phone: String,
+    val email: String,
     val maxCapacity: Int,
-    val availability: String = "", // Format: "Mon|08:00 AM|05:00 PM;Tue|10:00 AM|02:00 PM"
+    val hireDate: String = "",
+    val availability: String = "",
+    val subjectsHandled: String = "",
     val isSynced: Boolean = false
 )

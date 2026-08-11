@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,11 @@ fun DashboardScreen(viewModel: StudentViewModel) {
     val payments by viewModel.payments.collectAsState()
     val syncStatus by viewModel.syncStatus.collectAsState()
 
+    val context = LocalContext.current
+
+    // NEW: Controls the Export Confirmation Popup
+    var showExportDialog by remember { mutableStateOf(false) }
+
     // Date Logic for filtering sessions
     val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
@@ -47,11 +53,17 @@ fun DashboardScreen(viewModel: StudentViewModel) {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SpaceDashboard, contentDescription = "Dashboard", modifier = Modifier.padding(end = 8.dp))
-                        Text("Center Overview", fontWeight = FontWeight.Bold)
+                        Surface(shape = CircleShape, color = Color.White, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Eco, contentDescription = "Logo", tint = BrandGreen, modifier = Modifier.padding(4.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Smart Growth", fontWeight = FontWeight.ExtraBold)
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showExportDialog = true }) {
+                        Icon(Icons.Default.Download, contentDescription = "Export to ZIP", tint = Color.White)
+                    }
                     IconButton(onClick = { viewModel.performFullSync() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Sync to Cloud", tint = Color.White)
                     }
@@ -99,7 +111,6 @@ fun DashboardScreen(viewModel: StudentViewModel) {
                 }
             }
             items(todaysSessions) { session ->
-                // Reusing our beautiful SessionTicket from the SessionScreen!
                 SessionTicket(session = session, onClick = { /* View only on Dashboard */ })
             }
 
@@ -122,6 +133,37 @@ fun DashboardScreen(viewModel: StudentViewModel) {
                     SessionTicket(session = session, onClick = { })
                 }
             }
+        }
+
+        // NEW: Export Confirmation Dialog
+        if (showExportDialog) {
+            AlertDialog(
+                onDismissRequest = { showExportDialog = false },
+                containerColor = Color.White,
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Download, contentDescription = null, tint = BrandBlue)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Export Database", color = BrandBlue, fontWeight = FontWeight.Bold)
+                    }
+                },
+                text = { Text("Are you sure you want to download a complete ZIP backup of all Students, Tutors, Sessions, and Payments to this tablet?") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            exportDataToCSV(context, students, tutors, sessions, payments)
+                            showExportDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Confirm Export", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExportDialog = false }) { Text("Cancel", color = ChalkGray) }
+                }
+            )
         }
     }
 }

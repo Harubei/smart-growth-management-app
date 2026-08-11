@@ -5,8 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-// Version bumped to 9 for Dynamic Daily Scheduling!
-@Database(entities = [Student::class, Tutor::class, Session::class, Payment::class], version = 9, exportSchema = false)
+// Bumped to version 12 to force the local database to accept the new hireDate column!
+@Database(entities = [Student::class, Tutor::class, Session::class, Payment::class], version = 12, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun studentDao(): StudentDao
